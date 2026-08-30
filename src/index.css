@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+}
+
+body {
+  background-color: rgb(17, 17, 17);
+}
+
+/* Estilo general para la barra de scroll */
+::-webkit-scrollbar {
+  width: 12px; /* Ancho de la barra vertical */
+  height: 8px; /* Altura de la barra horizontal */
+}
+
+/* Color de fondo de la barra */
+::-webkit-scrollbar-track {
+  background: #070e1c; /* Gris oscuro */
+}
+
+/* Color y diseño del scroll (el deslizador) */
+::-webkit-scrollbar-thumb {
+  background: #2d3748; /* Gris intermedio */
+}
+
+/* Scroll al pasar el mouse */
+::-webkit-scrollbar-thumb:hover {
+  background: #718096; /* Gris claro */
+}
+
+/* Estilo de las esquinas del scrollbar */
+::-webkit-scrollbar-corner {
+  background: #2d3748; /* Fondo de la esquina */
+}

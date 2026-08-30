@@ -4,34 +4,47 @@
 
 * {
   margin: 0;
+  box-sizing: border-box;
 }
 
-body {
-  background-color: rgb(17, 17, 17);
-}
-
-/* Estilo general para la barra de scroll */
+/* Barra de desplazamiento ultra fina y redondeada estilo iOS */
 ::-webkit-scrollbar {
-  width: 12px; /* Ancho de la barra vertical */
-  height: 8px; /* Altura de la barra horizontal */
+  width: 5px;
+  height: 5px;
 }
 
-/* Color de fondo de la barra */
 ::-webkit-scrollbar-track {
-  background: #070e1c; /* Gris oscuro */
+  background: transparent;
 }
 
-/* Color y diseño del scroll (el deslizador) */
+/* Modo Claro: Deslizador sutil celeste/slate redondeado */
 ::-webkit-scrollbar-thumb {
-  background: #2d3748; /* Gris intermedio */
+  background: rgba(7, 153, 182, 0.28);
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
 }
 
-/* Scroll al pasar el mouse */
 ::-webkit-scrollbar-thumb:hover {
-  background: #718096; /* Gris claro */
+  background: rgba(7, 153, 182, 0.6);
 }
 
-/* Estilo de las esquinas del scrollbar */
-::-webkit-scrollbar-corner {
-  background: #2d3748; /* Fondo de la esquina */
+/* Modo Oscuro: Deslizador translúcido celeste/sinbad */
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(156, 210, 211, 0.25);
+  border-radius: 9999px;
 }
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 210, 211, 0.55);
+}
+
+/* Soporte para Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(7, 153, 182, 0.3) transparent;
+}
+
+.dark * {
+  scrollbar-color: rgba(156, 210, 211, 0.3) transparent;
+}
+

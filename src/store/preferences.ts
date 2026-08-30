@@ -2,14 +2,19 @@ import { User, Comment, CommentRes } from "../types";
 import { create } from "zustand";
 import { persist } from "zustand/middleware"; // Middleware para persistencia
 
+export type ThemeMode = "system" | "light" | "dark";
+
 export type CommentState = {
   user: User;
   comment: Comment;
   comments: CommentRes[];
+  theme: ThemeMode;
   setUser: (data: User) => void;
   setComment: (data: Comment) => void;
   setComments: (data: CommentRes[]) => void;
   addComment: (data: CommentRes) => void;
+  removeComment: (id: number) => void;
+  setTheme: (theme: ThemeMode) => void;
   resetUser: () => void;
 };
 
@@ -19,6 +24,7 @@ export const initialCommentState = {
     profileImg: "",
   },
   comments: [],
+  theme: "system" as ThemeMode,
   comment: {
     name: "",
     profileImg: "",
@@ -43,6 +49,12 @@ export const CommentStore = create<CommentState>()(
           user: { name: "", profileImg: "" },
         })),
 
+      // Acción para cambiar tema (system / light / dark)
+      setTheme: (theme) =>
+        set(() => ({
+          theme,
+        })),
+
       // Acción para actualizar el comentario
       setComment: (data) =>
         set(() => ({
@@ -64,10 +76,18 @@ export const CommentStore = create<CommentState>()(
             comments: [...state.comments, newMsg],
           };
         }),
+
+      // Acción para eliminar un comentario del estado
+      removeComment: (id) =>
+        set((state) => ({
+          comments: state.comments.filter((c) => c.id !== id),
+        })),
     }),
     {
       name: "comment-storage",
     }
   )
 );
+
+
 

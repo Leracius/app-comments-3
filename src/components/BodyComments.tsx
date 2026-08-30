@@ -3,8 +3,11 @@ import CardComment from "./CardComment";
 import { CommentStore } from "../store/preferences";
 
 export default function BodyComments() {
-  const { comments } = CommentStore();
+  const { comments, currentRoom, privateRooms } = CommentStore();
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const activePrivateRoom = privateRooms.find((r) => r.id === currentRoom);
+  const isPrivate = currentRoom !== "general";
 
   useEffect(() => {
     // Retardo mínimo para que el render complete y el scroll baje exactamente al final
@@ -16,20 +19,29 @@ export default function BodyComments() {
 
   return (
     <div className="flex flex-col gap-2.5 p-3 sm:p-4 h-full overflow-y-auto overscroll-contain">
-      {/* iOS Date / Info Pill */}
-      <div className="flex justify-center my-1">
+      {/* iOS Date / Privacy Info Pill */}
+      <div className="flex flex-col items-center justify-center my-1 gap-1">
         <span className="bg-slate-100/90 dark:bg-palette-eden-card/90 text-slate-500 dark:text-palette-sinbad text-[11px] font-medium px-3 py-1 rounded-full border border-slate-200/60 dark:border-palette-eden/60 shadow-2xs transition-colors">
-          Hoy • Supabase Realtime
+          {isPrivate ? `🔒 ${activePrivateRoom?.name || "Chat Privado"} • Mensajes Directos` : "Hoy • #General (Público)"}
         </span>
+        {isPrivate && (
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal">
+            Los mensajes enviados aquí solo son visibles para esta conversación.
+          </span>
+        )}
       </div>
 
       {comments.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 text-sm gap-2 h-full my-auto py-12">
           <div className="w-14 h-14 rounded-full bg-palette-bondi-light dark:bg-palette-bondi/20 text-palette-bondi dark:text-palette-sinbad flex items-center justify-center text-2xl shadow-2xs">
-            💬
+            {isPrivate ? "🔒" : "💬"}
           </div>
-          <p className="font-semibold text-slate-700 dark:text-palette-janna text-sm mt-1">Sin mensajes aún</p>
-          <span className="text-xs text-slate-400 dark:text-slate-500">Escribe el primer mensaje para comenzar</span>
+          <p className="font-semibold text-slate-700 dark:text-palette-janna text-sm mt-1">
+            {isPrivate ? "Conversación privada vacía" : "Sin mensajes aún"}
+          </p>
+          <span className="text-xs text-slate-400 dark:text-slate-500">
+            {isPrivate ? "Envía un mensaje privado para iniciar el chat" : "Escribe el primer mensaje para comenzar"}
+          </span>
         </div>
       ) : (
         comments.map((el) => <CardComment key={el.id} data={el} />)
@@ -38,6 +50,7 @@ export default function BodyComments() {
     </div>
   );
 }
+
 
 
 

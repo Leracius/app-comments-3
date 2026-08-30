@@ -8,6 +8,11 @@ import {
   IoMoonOutline,
   IoSunnyOutline,
   IoPhonePortraitOutline,
+  IoChatbubblesOutline,
+  IoCreateOutline,
+  IoLockClosedOutline,
+  IoGlobeOutline,
+  IoChevronDownOutline,
 } from "react-icons/io5";
 
 import { useEffect, useState, KeyboardEvent } from "react";
@@ -20,39 +25,98 @@ import {
   sendSystemAnnouncement,
   supabase,
 } from "../services/supabase";
-import { CommentRes } from "../types";
+import { CommentRes, ChatRoom } from "../types";
 
 export default function CommentInput() {
-  const { user, comments, theme, setTheme, setComments, addComment, resetUser } = CommentStore();
+  const {
+    user,
+    comments,
+    theme,
+    currentRoom,
+    privateRooms,
+    setTheme,
+    setCurrentRoom,
+    addPrivateRoom,
+    removePrivateRoom,
+    setComments,
+    addComment,
+    resetUser,
+  } = CommentStore();
+
   const [bodyComment, setBodyComment] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [isSending, setIsSending] = useState(false);
 
-  // Estados exclusivos de Administración para axeladmin
+  // Modales
+  const [showRoomSelector, setShowRoomSelector] = useState(false);
+  const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
+
+  // Estados para nuevo chat privado
+  const [chatTypeTab, setChatTypeTab] = useState<"dm" | "room">("dm");
+  const [targetUsername, setTargetUsername] = useState("");
+  const [roomNameInput, setRoomNameInput] = useState("");
+  const [roomPasscode, setRoomPasscode] = useState("");
+
+  // Estados de Admin
   const [announcementText, setAnnouncementText] = useState("");
   const [isSendingAnnouncement, setIsSendingAnnouncement] = useState(false);
   const [isDeletingDb, setIsDeletingDb] = useState(false);
 
   const isAdmin = user.name?.trim().toLowerCase() === "axeladmin";
 
-  useEffect(() => {
-    // 1. Cargar comentarios iniciales
-    const loadInitialComments = async () => {
-      const data = await getComments();
-      setComments(data);
-    };
-    loadInitialComments();
+  // Identificar información de la sala actual
+  const activePrivateRoom = privateRooms.find((r) => r.id === currentRoom);
+  const isPrivate = currentRoom !== "general";
 
-    // 2. Suscribirse a inserciones y borrados en tiempo real
+  // 1. Cargar comentarios cada vez que se cambia de sala
+  useEffect(() => {
+    let isMounted = true;
+    const loadRoomComments = async () => {
+      const data = await getComments(currentRoom);
+      if (isMounted) {
+        setComments(data);
+      }
+    };
+    loadRoomComments();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentRoom, setComments]);
+
+  // 2. Suscribirse a eventos Realtime de Supabase
+  useEffect(() => {
     const channel = supabase
-      .channel("realtime-comments")
+      .channel("realtime-comments-global")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "comments" },
         (payload) => {
-          if (payload.new) {
-            addComment(payload.new as CommentRes);
+          const newMsg = payload.new as CommentRes;
+          const msgRoom = newMsg?.room || "general";
+
+          // Si el mensaje pertenece a la sala actual, agregarlo en vivo
+          if (
+            msgRoom === currentRoom ||
+            (msgRoom === "general" && currentRoom === "general")
+          ) {
+            addComment(newMsg);
+          }
+
+          // Si es un mensaje directo para el usuario en otra conversación privada, auto-descubrir la sala
+          if (msgRoom.startsWith("dm:")) {
+            const participants = msgRoom.replace("dm:", "").split("_");
+            const myNameLower = user.name.trim().toLowerCase();
+            if (participants.includes(myNameLower)) {
+              const otherUser = participants.find((p) => p !== myNameLower) || "Chat";
+              addPrivateRoom({
+                id: msgRoom,
+                name: otherUser.charAt(0).toUpperCase() + otherUser.slice(1),
+                isPrivate: true,
+                recipient: otherUser,
+                avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(otherUser)}`,
+              });
+            }
           }
         }
       )
@@ -60,7 +124,8 @@ export default function CommentInput() {
         "postgres_changes",
         { event: "DELETE", schema: "public", table: "comments" },
         () => {
-          setComments([]);
+          // Recargar comentarios de la sala actual tras un borrado
+          getComments(currentRoom).then(setComments);
         }
       )
       .subscribe((status) => {
@@ -70,7 +135,7 @@ export default function CommentInput() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [setComments, addComment]);
+  }, [currentRoom, user.name, addComment, addPrivateRoom, setComments]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0] || null;
@@ -100,6 +165,7 @@ export default function CommentInput() {
         profileImg: user.profileImg,
         content: bodyComment.trim(),
         bodyImg: uploadedImg,
+        room: currentRoom,
       };
 
       await uploadComment(newComment);
@@ -113,17 +179,62 @@ export default function CommentInput() {
     }
   };
 
-  // Función Admin: Borrar base de datos completa
+  // Crear o unirse a un Chat Privado 1-a-1
+  const handleStartDM = () => {
+    const target = targetUsername.trim();
+    if (!target) return;
+    if (target.toLowerCase() === user.name.trim().toLowerCase()) {
+      alert("No puedes iniciar un chat privado contigo mismo.");
+      return;
+    }
+
+    const participants = [user.name.trim().toLowerCase(), target.toLowerCase()].sort();
+    const dmRoomId = `dm:${participants[0]}_${participants[1]}`;
+
+    const newRoom: ChatRoom = {
+      id: dmRoomId,
+      name: target.charAt(0).toUpperCase() + target.slice(1),
+      isPrivate: true,
+      recipient: target,
+      avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(target)}`,
+    };
+
+    addPrivateRoom(newRoom);
+    setTargetUsername("");
+    setShowNewChatModal(false);
+  };
+
+  // Crear o unirse a una Sala Privada con Código
+  const handleCreatePrivateRoom = () => {
+    const name = roomNameInput.trim();
+    if (!name) return;
+
+    const roomId = `room:${name.toLowerCase().replace(/\s+/g, "-")}`;
+    const newRoom: ChatRoom = {
+      id: roomId,
+      name: name,
+      isPrivate: true,
+      passcode: roomPasscode.trim(),
+      avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(name)}`,
+    };
+
+    addPrivateRoom(newRoom);
+    setRoomNameInput("");
+    setRoomPasscode("");
+    setShowNewChatModal(false);
+  };
+
+  // Función Admin: Borrar base de datos
   const handleClearDatabase = async () => {
     if (!isAdmin || isDeletingDb) return;
     const confirmDelete = window.confirm(
-      "⚠️ ¿Estás seguro de que deseas eliminar TODOS los mensajes de Supabase? Esta acción es irreversible."
+      "⚠️ ¿Estás seguro de que deseas eliminar los mensajes de Supabase? Esta acción es irreversible."
     );
     if (!confirmDelete) return;
 
     try {
       setIsDeletingDb(true);
-      await clearAllComments();
+      await clearAllComments(currentRoom);
       setComments([]);
       setShowAdminPanel(false);
     } catch (err: any) {
@@ -133,12 +244,12 @@ export default function CommentInput() {
     }
   };
 
-  // Función Admin: Enviar Anuncio Global del Sistema
+  // Función Admin: Enviar Anuncio Global
   const handleSendAnnouncement = async () => {
     if (!isAdmin || !announcementText.trim() || isSendingAnnouncement) return;
     try {
       setIsSendingAnnouncement(true);
-      await sendSystemAnnouncement(announcementText.trim());
+      await sendSystemAnnouncement(announcementText.trim(), currentRoom);
       setAnnouncementText("");
       setShowAdminPanel(false);
     } catch (err: any) {
@@ -153,35 +264,59 @@ export default function CommentInput() {
   return (
     <section className="text-slate-800 dark:text-palette-janna bg-white dark:bg-palette-eden-dark h-full w-full flex flex-col flex-1 min-h-0 overflow-hidden relative transition-colors duration-300">
       {/* iOS Navigation Header */}
-      <header className="px-4 py-2.5 bg-white/80 dark:bg-palette-eden-dark/80 backdrop-blur-xl border-b border-slate-200/80 dark:border-palette-eden/60 flex justify-between items-center shrink-0 z-10 sticky top-0 transition-colors">
-        <div className="flex items-center gap-2.5 min-w-0">
+      <header className="px-3.5 py-2.5 bg-white/85 dark:bg-palette-eden-dark/85 backdrop-blur-xl border-b border-slate-200/80 dark:border-palette-eden/60 flex justify-between items-center shrink-0 z-10 sticky top-0 transition-colors">
+        {/* Selector de Conversación / Información de la Sala */}
+        <button
+          onClick={() => setShowRoomSelector(true)}
+          className="flex items-center gap-2.5 min-w-0 text-left hover:bg-slate-100/80 dark:hover:bg-palette-eden/80 p-1.5 -ml-1.5 rounded-2xl transition active:scale-98 cursor-pointer"
+          title="Cambiar de conversación o sala"
+        >
           <div className="relative">
             <img
-              src={user.profileImg}
-              alt={user.name}
+              src={
+                isPrivate
+                  ? activePrivateRoom?.avatar ||
+                    `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(
+                      activePrivateRoom?.name || "Chat"
+                    )}`
+                  : user.profileImg
+              }
+              alt="Avatar"
               className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-palette-sinbad/40 shrink-0 shadow-2xs"
             />
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-palette-eden-dark rounded-full"></span>
           </div>
 
           <div className="min-w-0 leading-tight">
-            <div className="flex items-center gap-1.5">
-              <h3 className="text-[14.5px] font-semibold text-slate-900 dark:text-palette-janna tracking-tight truncate">
-                @{user.name}
+            <div className="flex items-center gap-1">
+              <h3 className="text-[14px] font-bold text-slate-900 dark:text-palette-janna tracking-tight truncate max-w-[130px] sm:max-w-[180px]">
+                {isPrivate ? activePrivateRoom?.name : "# General"}
               </h3>
-              {isAdmin && (
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[9.5px] font-bold bg-palette-bondi-light dark:bg-palette-bondi/20 text-palette-bondi dark:text-palette-sinbad border border-palette-bondi/30 dark:border-palette-bondi/40 shadow-2xs">
-                  <IoShieldCheckmark size={11} /> ADMIN
+              <IoChevronDownOutline size={14} className="text-slate-400 dark:text-palette-sinbad shrink-0" />
+              {isAdmin && !isPrivate && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-palette-bondi-light dark:bg-palette-bondi/20 text-palette-bondi dark:text-palette-sinbad border border-palette-bondi/30 shadow-2xs">
+                  <IoShieldCheckmark size={10} /> ADMIN
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-palette-bondi dark:text-palette-sinbad font-medium">
-              iMessage • En línea
+            <p className="text-[11px] text-palette-bondi dark:text-palette-sinbad font-medium truncate">
+              {isPrivate ? "🔒 Chat Privado" : "🌐 Chat Público • En línea"}
             </p>
           </div>
-        </div>
+        </button>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        {/* Acciones del Header */}
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Botón para Redactar / Iniciar Chat Privado */}
+          <button
+            onClick={() => setShowNewChatModal(true)}
+            title="Nuevo Chat Privado"
+            className="flex items-center gap-1 text-xs bg-palette-bondi-light dark:bg-palette-bondi/20 hover:bg-palette-bondi-light/80 dark:hover:bg-palette-bondi/30 text-palette-bondi dark:text-palette-sinbad border border-palette-bondi/30 px-2.5 py-1.5 rounded-full font-semibold transition active:scale-95 cursor-pointer shadow-2xs"
+          >
+            <IoCreateOutline size={16} />
+            <span className="hidden sm:inline">Nuevo Chat</span>
+          </button>
+
           {/* Botón rápido para alternar tema */}
           <button
             onClick={() => {
@@ -189,7 +324,7 @@ export default function CommentInput() {
               else if (theme === "dark") setTheme("light");
               else setTheme("system");
             }}
-            title={`Tema actual: ${theme.toUpperCase()} (Clic para alternar)`}
+            title={`Tema: ${theme.toUpperCase()}`}
             className="p-2 rounded-full bg-slate-100 dark:bg-palette-eden hover:bg-slate-200/80 dark:hover:bg-palette-eden-card text-slate-600 dark:text-palette-sinbad transition active:scale-95 cursor-pointer"
           >
             {theme === "dark" ? (
@@ -206,10 +341,9 @@ export default function CommentInput() {
             <button
               onClick={() => setShowAdminPanel(true)}
               title="Panel de Administrador"
-              className="flex items-center gap-1 text-xs bg-slate-100 dark:bg-palette-eden hover:bg-slate-200/80 dark:hover:bg-palette-eden-card text-palette-bondi dark:text-palette-sinbad border border-slate-200/60 dark:border-palette-eden/80 px-2.5 py-1.5 rounded-full font-medium transition active:scale-95 cursor-pointer shadow-2xs"
+              className="flex items-center gap-1 text-xs bg-slate-100 dark:bg-palette-eden hover:bg-slate-200/80 dark:hover:bg-palette-eden-card text-palette-bondi dark:text-palette-sinbad border border-slate-200/60 dark:border-palette-eden/80 p-2 rounded-full font-medium transition active:scale-95 cursor-pointer shadow-2xs"
             >
-              <IoShieldCheckmark size={14} />
-              <span className="hidden sm:inline font-semibold">Admin</span>
+              <IoShieldCheckmark size={15} />
             </button>
           )}
 
@@ -218,12 +352,249 @@ export default function CommentInput() {
             title="Cerrar sesión"
             className="text-slate-400 hover:text-red-500 p-2 rounded-full hover:bg-slate-100 dark:hover:bg-palette-eden transition active:scale-95 cursor-pointer"
           >
-            <IoLogOutOutline size={20} />
+            <IoLogOutOutline size={19} />
           </button>
         </div>
       </header>
 
-      {/* Modal / Action Sheet de Panel de Administración para axeladmin */}
+      {/* ========================================================================= */}
+      {/* 1. Modal / Action Sheet: Selector de Conversaciones & Salas (iOS Style)    */}
+      {/* ========================================================================= */}
+      {showRoomSelector && (
+        <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white/95 dark:bg-palette-eden-card/95 backdrop-blur-2xl border border-slate-200 dark:border-palette-eden/60 rounded-3xl p-5 sm:p-6 max-w-sm w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150 text-slate-800 dark:text-palette-janna">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-palette-eden pb-3">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 bg-palette-bondi-light dark:bg-palette-bondi/20 text-palette-bondi dark:text-palette-sinbad rounded-xl">
+                  <IoChatbubblesOutline size={18} />
+                </span>
+                <h3 className="text-[15px] font-bold text-slate-900 dark:text-palette-janna">
+                  Tus Conversaciones
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowRoomSelector(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-full hover:bg-slate-100 dark:hover:bg-palette-eden"
+              >
+                <IoCloseOutline size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {/* Sala Global / Pública */}
+              <button
+                onClick={() => {
+                  setCurrentRoom("general");
+                  setShowRoomSelector(false);
+                }}
+                className={`w-full flex items-center justify-between p-3 rounded-2xl border text-left transition active:scale-98 ${
+                  currentRoom === "general"
+                    ? "bg-palette-bondi text-white border-palette-bondi shadow-sm"
+                    : "bg-slate-50 dark:bg-palette-eden-darker hover:bg-slate-100 dark:hover:bg-palette-eden border-slate-200/80 dark:border-palette-eden/60 text-slate-800 dark:text-palette-janna"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-palette-bondi-light dark:bg-palette-bondi/20 flex items-center justify-center text-palette-bondi dark:text-palette-sinbad text-lg">
+                    <IoGlobeOutline />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold"># General</p>
+                    <p className={`text-[11px] ${currentRoom === "general" ? "text-white/80" : "text-slate-400 dark:text-palette-sinbad/70"}`}>
+                      Chat público de la comunidad
+                    </p>
+                  </div>
+                </div>
+                {currentRoom === "general" && <span className="text-xs font-bold">Activo</span>}
+              </button>
+
+              {/* Lista de Chats Privados */}
+              {privateRooms.length > 0 && (
+                <div className="pt-2">
+                  <p className="text-[11px] font-bold text-slate-400 dark:text-palette-sinbad uppercase tracking-wider mb-2 pl-1">
+                    Chats Privados
+                  </p>
+                  <div className="space-y-1.5">
+                    {privateRooms.map((room) => (
+                      <div
+                        key={room.id}
+                        className={`flex items-center justify-between p-2.5 rounded-2xl border transition ${
+                          currentRoom === room.id
+                            ? "bg-palette-bondi text-white border-palette-bondi shadow-sm"
+                            : "bg-slate-50 dark:bg-palette-eden-darker hover:bg-slate-100 dark:hover:bg-palette-eden border-slate-200/80 dark:border-palette-eden/60 text-slate-800 dark:text-palette-janna"
+                        }`}
+                      >
+                        <button
+                          onClick={() => {
+                            setCurrentRoom(room.id);
+                            setShowRoomSelector(false);
+                          }}
+                          className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
+                        >
+                          <img
+                            src={room.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(room.name)}`}
+                            alt={room.name}
+                            className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-palette-sinbad/40 shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold truncate">@{room.name}</p>
+                            <p className={`text-[10px] truncate ${currentRoom === room.id ? "text-white/80" : "text-slate-400"}`}>
+                              {room.recipient ? `Mensaje Directo` : `Sala Privada`}
+                            </p>
+                          </div>
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removePrivateRoom(room.id);
+                          }}
+                          title="Cerrar conversación"
+                          className={`p-1.5 rounded-lg hover:bg-red-500/20 text-xs transition ${
+                            currentRoom === room.id ? "text-white/80 hover:text-white" : "text-slate-400 hover:text-red-500"
+                          }`}
+                        >
+                          <IoCloseOutline size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => {
+                setShowRoomSelector(false);
+                setShowNewChatModal(true);
+              }}
+              className="w-full py-3 bg-palette-bondi hover:bg-palette-bondi-hover active:scale-98 text-white text-xs font-bold rounded-2xl transition shadow-md shadow-palette-bondi/25 flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <IoCreateOutline size={16} />
+              Iniciar Nueva Conversación Privada
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 2. Modal: Iniciar Nueva Conversación Privada (1-a-1 o Sala con PIN)       */}
+      {/* ========================================================================= */}
+      {showNewChatModal && (
+        <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white/95 dark:bg-palette-eden-card/95 backdrop-blur-2xl border border-slate-200 dark:border-palette-eden/60 rounded-3xl p-5 sm:p-6 max-w-sm w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150 text-slate-800 dark:text-palette-janna">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-palette-eden pb-3">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 bg-palette-bondi-light dark:bg-palette-bondi/20 text-palette-bondi dark:text-palette-sinbad rounded-xl">
+                  <IoLockClosedOutline size={18} />
+                </span>
+                <h3 className="text-[15px] font-bold text-slate-900 dark:text-palette-janna">
+                  Nueva Conversación Privada
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowNewChatModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-full hover:bg-slate-100 dark:hover:bg-palette-eden"
+              >
+                <IoCloseOutline size={20} />
+              </button>
+            </div>
+
+            {/* Selector de tipo de chat (Tabs iOS) */}
+            <div className="grid grid-cols-2 gap-1.5 bg-slate-100 dark:bg-palette-eden-darker p-1 rounded-2xl border border-slate-200/60 dark:border-palette-eden/60">
+              <button
+                onClick={() => setChatTypeTab("dm")}
+                className={`py-1.5 text-xs font-semibold rounded-xl transition ${
+                  chatTypeTab === "dm"
+                    ? "bg-white dark:bg-palette-bondi text-palette-bondi dark:text-white shadow-xs"
+                    : "text-slate-500 dark:text-slate-400"
+                }`}
+              >
+                Chat Directo (1 a 1)
+              </button>
+              <button
+                onClick={() => setChatTypeTab("room")}
+                className={`py-1.5 text-xs font-semibold rounded-xl transition ${
+                  chatTypeTab === "room"
+                    ? "bg-white dark:bg-palette-bondi text-palette-bondi dark:text-white shadow-xs"
+                    : "text-slate-500 dark:text-slate-400"
+                }`}
+              >
+                Sala con Código
+              </button>
+            </div>
+
+            {chatTypeTab === "dm" ? (
+              <div className="space-y-3 pt-1">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-palette-sinbad uppercase tracking-wider mb-1.5 pl-1">
+                    ¿Con quién deseas hablar?
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Lucas, Satoshi, Maria..."
+                    className="bg-slate-50 dark:bg-palette-eden-darker border border-slate-200 dark:border-palette-eden rounded-2xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-palette-janna placeholder-slate-400 w-full focus:outline-none focus:border-palette-bondi focus:bg-white"
+                    value={targetUsername}
+                    onChange={(e) => setTargetUsername(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleStartDM();
+                    }}
+                    autoFocus
+                  />
+                  <p className="text-[10.5px] text-slate-400 dark:text-slate-400 mt-1 pl-1">
+                    Se creará un canal privado exclusivo y encriptado para ustedes dos.
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleStartDM}
+                  disabled={!targetUsername.trim()}
+                  className="w-full py-3 bg-palette-bondi hover:bg-palette-bondi-hover active:scale-98 text-white text-xs font-bold rounded-2xl transition disabled:opacity-40 shadow-md shadow-palette-bondi/25 cursor-pointer"
+                >
+                  Abrir Chat Privado
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3 pt-1">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-palette-sinbad uppercase tracking-wider mb-1 pl-1">
+                    Nombre de la Sala
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Proyecto Secreto, Gaming..."
+                    className="bg-slate-50 dark:bg-palette-eden-darker border border-slate-200 dark:border-palette-eden rounded-2xl px-3.5 py-2 text-xs text-slate-800 dark:text-palette-janna placeholder-slate-400 w-full focus:outline-none focus:border-palette-bondi focus:bg-white"
+                    value={roomNameInput}
+                    onChange={(e) => setRoomNameInput(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-palette-sinbad uppercase tracking-wider mb-1 pl-1">
+                    Código / PIN de Acceso (Opcional)
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="Ej. 1234"
+                    className="bg-slate-50 dark:bg-palette-eden-darker border border-slate-200 dark:border-palette-eden rounded-2xl px-3.5 py-2 text-xs text-slate-800 dark:text-palette-janna placeholder-slate-400 w-full focus:outline-none focus:border-palette-bondi focus:bg-white"
+                    value={roomPasscode}
+                    onChange={(e) => setRoomPasscode(e.target.value)}
+                  />
+                </div>
+                <button
+                  onClick={handleCreatePrivateRoom}
+                  disabled={!roomNameInput.trim()}
+                  className="w-full py-3 bg-palette-bondi hover:bg-palette-bondi-hover active:scale-98 text-white text-xs font-bold rounded-2xl transition disabled:opacity-40 shadow-md shadow-palette-bondi/25 cursor-pointer"
+                >
+                  Entrar a la Sala Privada
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. Modal / Action Sheet: Panel de Administración (axeladmin)              */}
+      {/* ========================================================================= */}
       {showAdminPanel && (
         <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white/95 dark:bg-palette-eden-card/95 backdrop-blur-2xl border border-slate-200 dark:border-palette-eden/60 rounded-3xl p-5 sm:p-6 max-w-sm w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150 text-slate-800 dark:text-palette-janna">
@@ -232,7 +603,9 @@ export default function CommentInput() {
                 <span className="p-1.5 bg-palette-bondi-light dark:bg-palette-bondi/20 text-palette-bondi dark:text-palette-sinbad rounded-xl">
                   <IoShieldCheckmark size={18} />
                 </span>
-                <h3 className="text-[15px] font-bold text-slate-900 dark:text-palette-janna">Ajustes de Administrador</h3>
+                <h3 className="text-[15px] font-bold text-slate-900 dark:text-palette-janna">
+                  Ajustes de Administrador
+                </h3>
               </div>
               <button
                 onClick={() => setShowAdminPanel(false)}
@@ -264,14 +637,18 @@ export default function CommentInput() {
               </div>
             </div>
 
-            {/* Estadísticas del Chat (iOS Segmented Cards) */}
+            {/* Estadísticas del Chat */}
             <div className="grid grid-cols-2 gap-2.5 bg-slate-50 dark:bg-palette-eden-darker p-3 rounded-2xl border border-slate-200/60 dark:border-palette-eden/60">
               <div>
-                <p className="text-[10.5px] font-semibold text-slate-400 dark:text-palette-sinbad/70 uppercase tracking-wider">Mensajes</p>
+                <p className="text-[10.5px] font-semibold text-slate-400 dark:text-palette-sinbad/70 uppercase tracking-wider">
+                  Mensajes ({isPrivate ? "Sala" : "Global"})
+                </p>
                 <p className="text-lg font-bold text-slate-900 dark:text-palette-janna">{comments.length}</p>
               </div>
               <div>
-                <p className="text-[10.5px] font-semibold text-slate-400 dark:text-palette-sinbad/70 uppercase tracking-wider">Participantes</p>
+                <p className="text-[10.5px] font-semibold text-slate-400 dark:text-palette-sinbad/70 uppercase tracking-wider">
+                  Participantes
+                </p>
                 <p className="text-lg font-bold text-palette-bondi dark:text-palette-sinbad">{uniqueUsersCount}</p>
               </div>
             </div>
@@ -279,7 +656,7 @@ export default function CommentInput() {
             {/* Enviar Comunicado Oficial */}
             <div className="space-y-1.5">
               <label className="text-[11px] font-semibold text-slate-600 dark:text-palette-sinbad uppercase tracking-wider flex items-center gap-1.5">
-                <VscMegaphone className="text-palette-bondi" /> Anuncio Global
+                <VscMegaphone className="text-palette-bondi" /> Anuncio Oficial ({isPrivate ? "En esta sala" : "Global"})
               </label>
               <div className="flex gap-1.5">
                 <input
@@ -310,7 +687,7 @@ export default function CommentInput() {
                 className="w-full py-2.5 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/50 active:scale-98 border border-red-200 dark:border-red-800/60 text-red-600 dark:text-red-300 text-xs font-semibold rounded-2xl transition flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <VscTrash size={15} />
-                {isDeletingDb ? "Borrando mensajes..." : "Vaciar Base de Datos"}
+                {isDeletingDb ? "Borrando mensajes..." : `Vaciar ${isPrivate ? "esta sala" : "Base de Datos"}`}
               </button>
 
               <p className="text-[10px] text-center text-slate-400 dark:text-slate-500 pt-1 font-medium">
@@ -320,7 +697,6 @@ export default function CommentInput() {
           </div>
         </div>
       )}
-
 
       {/* Lista de Comentarios */}
       <div className="flex-1 min-h-0 overflow-hidden bg-gradient-to-b from-slate-50/50 to-white dark:from-palette-eden-dark dark:to-palette-eden-darker flex flex-col transition-colors">
@@ -361,7 +737,7 @@ export default function CommentInput() {
           <input
             id="message-input"
             type="text"
-            placeholder="iMessage..."
+            placeholder={isPrivate ? `Mensaje privado para @${activePrivateRoom?.name}...` : "iMessage en #General..."}
             className="bg-slate-100/90 dark:bg-palette-eden-darker hover:bg-slate-100 dark:hover:bg-palette-eden-darker focus:bg-white dark:focus:bg-palette-eden-darker border border-slate-200/80 dark:border-palette-eden/80 focus:border-palette-bondi rounded-full pl-4 pr-10 py-2 w-full text-slate-900 dark:text-palette-janna placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none transition text-[16px] sm:text-[14.5px] leading-normal focus:ring-3 focus:ring-palette-bondi/10 shadow-inner"
             value={bodyComment}
             onChange={(e) => setBodyComment(e.target.value)}
@@ -384,6 +760,7 @@ export default function CommentInput() {
     </section>
   );
 }
+
 
 
 

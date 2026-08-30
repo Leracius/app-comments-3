@@ -4,13 +4,18 @@ import { handleUpload } from "./cloudinary";
 
 export { supabase };
 
-// 1. Obtener todos los comentarios ordenados por fecha de creación
-export const getComments = async (): Promise<CommentRes[]> => {
+// 1. Obtener comentarios filtrados por sala (por defecto 'general')
+export const getComments = async (room: string = "general"): Promise<CommentRes[]> => {
   try {
-    const { data, error } = await supabase
-      .from("comments")
-      .select("*")
-      .order("createdAt", { ascending: true });
+    let query = supabase.from("comments").select("*");
+
+    if (!room || room === "general") {
+      query = query.or("room.eq.general,room.is.null");
+    } else {
+      query = query.eq("room", room);
+    }
+
+    const { data, error } = await query.order("createdAt", { ascending: true });
 
     if (error) {
       console.error("Error obteniendo comentarios:", error.message);
@@ -24,7 +29,7 @@ export const getComments = async (): Promise<CommentRes[]> => {
   }
 };
 
-// 2. Enviar / publicar un nuevo comentario
+// 2. Enviar / publicar un nuevo comentario en la sala indicada
 export const uploadComment = async (comment: Comment) => {
   try {
     const { data, error } = await supabase
@@ -35,6 +40,7 @@ export const uploadComment = async (comment: Comment) => {
           profileImg: comment.profileImg,
           content: comment.content,
           bodyImg: comment.bodyImg || "",
+          room: comment.room || "general",
         },
       ])
       .select();
@@ -87,13 +93,22 @@ export const uploadImageToStorage = async (file: File): Promise<string> => {
   }
 };
 
-// 4. Borrar todos los comentarios de la base de datos (Función Admin)
-export const clearAllComments = async (): Promise<boolean> => {
+// 4. Borrar comentarios de la base de datos (por sala o completa)
+export const clearAllComments = async (room?: string): Promise<boolean> => {
   try {
-    const { error } = await supabase
-      .from("comments")
-      .delete()
-      .gte("id", 0);
+    let query = supabase.from("comments").delete();
+
+    if (room && room !== "all") {
+      if (room === "general") {
+        query = query.or("room.eq.general,room.is.null");
+      } else {
+        query = query.eq("room", room);
+      }
+    } else {
+      query = query.gte("id", 0);
+    }
+
+    const { error } = await query;
 
     if (error) {
       console.error("Error al borrar comentarios:", error.message);
@@ -126,14 +141,16 @@ export const deleteSingleComment = async (commentId: number): Promise<boolean> =
 };
 
 // 6. Enviar anuncio oficial del sistema (Función Admin)
-export const sendSystemAnnouncement = async (announcement: string): Promise<any> => {
+export const sendSystemAnnouncement = async (announcement: string, room: string = "general"): Promise<any> => {
   return await uploadComment({
     name: "SISTEMA",
     profileImg: "https://api.dicebear.com/7.x/bottts/svg?seed=SYSTEM_ADMIN_CORE",
     content: `📢 [ANUNCIO OFICIAL]: ${announcement}`,
     bodyImg: "",
+    room,
   });
 };
+
 
 
 

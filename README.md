@@ -1,4 +1,4 @@
-﻿# 💬 Realtime iOS Chat & Messaging App (Serverless)
+# 💬 Realtime iOS Chat & Messaging App (Serverless)
 
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
@@ -28,11 +28,17 @@ La interfaz está construida siguiendo las directrices de diseño de iOS (*Human
 ## 🚀 Características Principales
 
 * ⚡ **Sincronización en Tiempo Real:** Suscripción directa a eventos `INSERT` y `DELETE` en PostgreSQL a través de **Supabase Realtime WebSockets** sin necesidad de recargar la página.
+* 🔒 **Conversaciones Privadas & Salas Protegidas:**
+  * **Chats Directos (1 a 1 DMs):** Inicia chats privados exclusivos con cualquier usuario (ej: entre *Axel* y *Lucas*) con aislamiento de mensajes.
+  * **Salas con Código / PIN:** Crea salas privadas protegidas para grupos cerrados.
+  * **Selector de Conversaciones iOS:** Menú interactivo en el encabezado para alternar al instante entre **🌐 # General** y tus chats privados.
 * 📱 **UI de Alta Precisión Estilo iOS (iMessage):**
   * Encabezado de navegación con efecto vidrio esmerilado (`backdrop-blur-xl`).
+  * Selector de salas con avatares de participantes y botón de redactar nuevo chat.
   * Burbujas de chat con colas asimétricas iOS (`rounded-[20px] rounded-br-[4px]`).
   * Barra de entrada tipo píldora (*pill input*) con botón de adjuntos **`+`** y botón circular de envío.
-  * Píldoras de estado y fecha (*"Hoy • Supabase Realtime"*).
+  * Píldoras de estado y fecha (*"Hoy • #General"* y *"🔒 Chat Privado"*).
+
 * 🌓 **Detección Automática de Tema (Auto Light / Dark Mode):**
   * Sincronización automática en vivo con la preferencia del sistema operativo (`prefers-color-scheme`).
   * Alternador manual de tema (📱 **Auto**, ☀️ **Claro**, 🌙 **Oscuro**) con un solo clic.
@@ -128,18 +134,24 @@ VITE_SUPABASE_KEY=TU_ANON_PUBLIC_KEY
 En el **SQL Editor** de tu consola de Supabase, ejecuta el siguiente script para crear la tabla, habilitar Realtime y configurar las políticas de seguridad (RLS):
 
 ```sql
--- 1. Crear tabla de mensajes
+-- 1. Crear tabla de mensajes (o actualizarla con la columna 'room')
 CREATE TABLE IF NOT EXISTS public.comments (
     id BIGSERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     "profileImg" TEXT NOT NULL,
     content TEXT,
     "bodyImg" TEXT,
+    room TEXT DEFAULT 'general',
     "createdAt" TIMESTAMPTZ DEFAULT NOW(),
     "updatedAt" TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Si ya tienes la tabla existente, agrega la columna y el índice:
+ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS room TEXT DEFAULT 'general';
+CREATE INDEX IF NOT EXISTS idx_comments_room ON public.comments(room);
+
 -- 2. Habilitar seguridad por fila (RLS)
+
 ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Lectura publica de mensajes" ON public.comments

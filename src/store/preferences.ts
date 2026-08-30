@@ -1,4 +1,4 @@
-import { User, Comment, CommentRes } from "../types";
+import { User, Comment, CommentRes, ChatRoom } from "../types";
 import { create } from "zustand";
 import { persist } from "zustand/middleware"; // Middleware para persistencia
 
@@ -9,12 +9,17 @@ export type CommentState = {
   comment: Comment;
   comments: CommentRes[];
   theme: ThemeMode;
+  currentRoom: string;
+  privateRooms: ChatRoom[];
   setUser: (data: User) => void;
   setComment: (data: Comment) => void;
   setComments: (data: CommentRes[]) => void;
   addComment: (data: CommentRes) => void;
   removeComment: (id: number) => void;
   setTheme: (theme: ThemeMode) => void;
+  setCurrentRoom: (roomId: string) => void;
+  addPrivateRoom: (room: ChatRoom) => void;
+  removePrivateRoom: (roomId: string) => void;
   resetUser: () => void;
 };
 
@@ -25,11 +30,14 @@ export const initialCommentState = {
   },
   comments: [],
   theme: "system" as ThemeMode,
+  currentRoom: "general",
+  privateRooms: [] as ChatRoom[],
   comment: {
     name: "",
     profileImg: "",
     content: "",
     bodyImg: "",
+    room: "general",
   },
 };
 
@@ -47,6 +55,7 @@ export const CommentStore = create<CommentState>()(
       resetUser: () =>
         set(() => ({
           user: { name: "", profileImg: "" },
+          currentRoom: "general",
         })),
 
       // Acción para cambiar tema (system / light / dark)
@@ -54,6 +63,36 @@ export const CommentStore = create<CommentState>()(
         set(() => ({
           theme,
         })),
+
+      // Acción para cambiar de sala / conversación
+      setCurrentRoom: (roomId) =>
+        set(() => ({
+          currentRoom: roomId,
+          comments: [], // limpiar vista previa mientras carga la nueva sala
+        })),
+
+      // Acción para agregar una conversación privada a la lista
+      addPrivateRoom: (room) =>
+        set((state) => {
+          const exists = state.privateRooms.some((r) => r.id === room.id);
+          if (exists) {
+            return { currentRoom: room.id };
+          }
+          return {
+            privateRooms: [room, ...state.privateRooms],
+            currentRoom: room.id,
+          };
+        }),
+
+      // Acción para eliminar / cerrar un chat privado
+      removePrivateRoom: (roomId) =>
+        set((state) => {
+          const remaining = state.privateRooms.filter((r) => r.id !== roomId);
+          return {
+            privateRooms: remaining,
+            currentRoom: state.currentRoom === roomId ? "general" : state.currentRoom,
+          };
+        }),
 
       // Acción para actualizar el comentario
       setComment: (data) =>
@@ -88,6 +127,7 @@ export const CommentStore = create<CommentState>()(
     }
   )
 );
+
 
 
 

@@ -312,10 +312,15 @@ export default function CommentInput() {
                 <VscTrash size={15} />
                 {isDeletingDb ? "Borrando mensajes..." : "Vaciar Base de Datos"}
               </button>
+
+              <p className="text-[10px] text-center text-slate-400 dark:text-slate-500 pt-1 font-medium">
+                Desarrollado con ❤️ por <span className="text-palette-bondi dark:text-palette-sinbad font-semibold">Axel Quintana</span>
+              </p>
             </div>
           </div>
         </div>
       )}
+
 
       {/* Lista de Comentarios */}
       <div className="flex-1 min-h-0 overflow-hidden bg-gradient-to-b from-slate-50/50 to-white dark:from-palette-eden-dark dark:to-palette-eden-darker flex flex-col transition-colors">

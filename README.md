@@ -1,4 +1,4 @@
-# 💬 Realtime Comments & Chat App (Serverless)
+﻿# 💬 Realtime iOS Chat & Messaging App (Serverless)
 
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
@@ -7,33 +7,61 @@
 ![Supabase](https://img.shields.io/badge/Supabase-Realtime-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
 ![Zustand](https://img.shields.io/badge/Zustand-State_Management-4338CA?style=for-the-badge)
 
-Una aplicación de mensajería y comentarios en tiempo real moderna, rápida y **100% Serverless**, inspirada en la experiencia de chat de WhatsApp. Permite la comunicación instantánea entre múltiples usuarios mediante **WebSockets** gracias al motor de tiempo real de **Supabase** y **PostgreSQL**.
+Una aplicación de mensajería instantánea en tiempo real moderna, elegante y **100% Serverless**, diseñada con el lenguaje visual de **Apple iOS (iMessage)** y una paleta cromática armónica de 5 tonos (Bondi Blue, San Marino, Eden, Sinbad y Janna). Permite la comunicación en tiempo real con WebSockets mediante **Supabase Realtime** y **PostgreSQL**.
+
+---
+
+## 🎨 Paleta de Diseño y Estética Visual
+
+La interfaz está construida siguiendo las directrices de diseño de iOS (*Human Interface Guidelines*), incorporando superficies translúcidas (*Frosted Glass*), micro-interacciones suaves y una paleta de color personalizada:
+
+| Color | Hex | Nombre | Rol en la Interfaz |
+| :--- | :---: | :--- | :--- |
+| ![#0799b6](https://via.placeholder.com/15/0799b6/000000?text=+) **Bondi Blue** | `#0799b6` | Principal / Acento | Botones de acción (Enviar, Ingresar), degradado de burbujas enviadas y badges. |
+| ![#4a6eb0](https://via.placeholder.com/15/4a6eb0/000000?text=+) **San Marino** | `#4a6eb0` | Secundario / Acento | Degradados, bordes activos y estados hover. |
+| ![#114c5f](https://via.placeholder.com/15/114c5f/000000?text=+) **Eden** | `#114c5f` | Tipografía / Oscuro | Textos de alto contraste en modo claro y superficies profundas en modo oscuro. |
+| ![#9cd2d3](https://via.placeholder.com/15/9cd2d3/000000?text=+) **Sinbad** | `#9cd2d3` | Hielo / Celeste | Burbujas de mensajes recibidos, etiquetas de usuario e indicadores. |
+| ![#f2e6cf](https://via.placeholder.com/15/f2e6cf/000000?text=+) **Janna** | `#f2e6cf` | Cálido / Acentos | Banners de anuncios oficiales del sistema y acentos visuales cálidos. |
 
 ---
 
 ## 🚀 Características Principales
 
-* ⚡ **Sincronización en Tiempo Real:** Suscripción directa a eventos `INSERT` en PostgreSQL a través de **Supabase Realtime**, permitiendo recibir mensajes al instante entre diferentes usuarios y dispositivos sin recargar.
-* 👤 **Onboarding y Perfil de Usuario:** Creación de perfil interactivo con foto personalizada o generación automática de avatares únicos basados en el nombre.
-* 💬 **Burbujas de Chat Estilo WhatsApp:** Diferenciación visual clara entre mensajes propios (derecha en tono índigo) y mensajes de otros participantes (izquierda en tono oscuro), con etiquetas de hora formateadas.
-* 🖼️ **Soporte Multimedia:** Envío de imágenes y adjuntos en la conversación almacenados de forma segura en la nube (Supabase Storage / Cloudinary).
-* 📜 **Auto-scroll Inteligente:** Desplazamiento automático fluido hacia el último mensaje recibido para mantener siempre el foco en la conversación activa.
-* 📦 **Estado Global Persistente:** Gestión de estado reactiva y ultra ligera con **Zustand**, persistiendo la sesión del usuario en `localStorage`.
-* 🛡️ **Seguridad RLS (Row Level Security):** Políticas de seguridad declarativas configuradas directamente en PostgreSQL para control granular de lectura e inserción.
+* ⚡ **Sincronización en Tiempo Real:** Suscripción directa a eventos `INSERT` y `DELETE` en PostgreSQL a través de **Supabase Realtime WebSockets** sin necesidad de recargar la página.
+* 📱 **UI de Alta Precisión Estilo iOS (iMessage):**
+  * Encabezado de navegación con efecto vidrio esmerilado (`backdrop-blur-xl`).
+  * Burbujas de chat con colas asimétricas iOS (`rounded-[20px] rounded-br-[4px]`).
+  * Barra de entrada tipo píldora (*pill input*) con botón de adjuntos **`+`** y botón circular de envío.
+  * Píldoras de estado y fecha (*"Hoy • Supabase Realtime"*).
+* 🌓 **Detección Automática de Tema (Auto Light / Dark Mode):**
+  * Sincronización automática en vivo con la preferencia del sistema operativo (`prefers-color-scheme`).
+  * Alternador manual de tema (📱 **Auto**, ☀️ **Claro**, 🌙 **Oscuro**) con un solo clic.
+* 📜 **Barra de Scroll Ultra Fina y Redondeada (iOS Slim Scrollbar):**
+  * Grosor minimalista de **5px** con bordes de píldora redondeados (`rounded-full`).
+  * Translucidez adaptativa que cambia de color dinámicamente entre modo claro y oscuro.
+* 👑 **Herramientas de Control para Administrador (`axeladmin`):**
+  * **Insignia VIP:** Insignia dorada/celeste `🛡️ ADMIN` en el encabezado al ingresar como `axeladmin`.
+  * **Panel de Control (iOS Action Sheet):** Métricas del chat en vivo (total de mensajes y participantes únicos).
+  * **Difusión Global (Broadcast):** Envío de comunicados oficiales destacados del `SISTEMA`.
+  * **Moderación Individual:** Botón discreto de eliminación por mensaje para borrar mensajes de prueba o inapropiados.
+  * **Reset de Base de Datos:** Opción de purgar todos los mensajes de Supabase con ventana de confirmación.
+* 🖼️ **Soporte Multimedia:** Envío de imágenes con previsualización en el chat, almacenadas en Supabase Storage (con fallback a Cloudinary).
+* 👤 **Onboarding y Avatares Inteligentes:** Generación automática de avatares vía DiceBear Bottts o subida de foto de perfil personalizada.
+* 📦 **Persistencia de Sesión:** Gestión de estado ultra rápida con **Zustand** y almacenamiento en `localStorage`.
 
 ---
 
 ## 🛠️ Stack Tecnológico
 
-| Capa | Tecnología | Propósito |
+| Capa | Tecnología | Descripción |
 | :--- | :--- | :--- |
-| **Frontend UI** | [React 18](https://react.dev/) | Librería principal para construcción de interfaces reactivas. |
-| **Lenguaje** | [TypeScript](https://www.typescriptlang.org/) | Tipado estático y robustez en todo el flujo de datos. |
-| **Bundler & Dev** | [Vite](https://vitejs.dev/) | Entorno de desarrollo ultrarrápido y empaquetado optimizado. |
-| **Estilos** | [Tailwind CSS](https://tailwindcss.com/) | Diseño responsivo, tema oscuro nativo y componentes estilizados. |
-| **State Management** | [Zustand](https://zustand-demo.pmnd.rs/) | Manejo de estado global con persistencia de usuario y mensajes. |
-| **BaaS / Backend** | [Supabase](https://supabase.com/) | Base de datos PostgreSQL, canal Realtime WebSockets y Storage. |
-| **Iconos** | [React Icons](https://react-icons.github.io/react-icons/) | Iconografía moderna e interactiva. |
+| **Frontend Framework** | [React 18](https://react.dev/) | Componentes declarativos y reactividad. |
+| **Tipado** | [TypeScript 5.6](https://www.typescriptlang.org/) | Tipado estático de extremo a extremo. |
+| **Bundler & Build** | [Vite 5.4](https://vitejs.dev/) | HMR instantáneo y empaquetado optimizado para producción. |
+| **Estilos & UI** | [Tailwind CSS 3.4](https://tailwindcss.com/) | Utilidades CSS, soporte nativo de modo oscuro y clases semánticas. |
+| **Gestión de Estado** | [Zustand](https://zustand-demo.pmnd.rs/) | Store global con middleware de persistencia. |
+| **Backend as a Service** | [Supabase](https://supabase.com/) | PostgreSQL, Realtime WebSockets, Storage y RLS. |
+| **Iconografía** | [React Icons](https://react-icons.github.io/react-icons/) | Iconos vectoriales de Ionicons y VSCode. |
 
 ---
 
@@ -41,42 +69,45 @@ Una aplicación de mensajería y comentarios en tiempo real moderna, rápida y *
 
 ```text
 app-comments/
-├── public/                 # Recursos estáticos
+├── public/
+│   ├── favicon.svg          # Favicon vectorial personalizado iOS
+│   └── vite.svg
 ├── src/
-│   ├── components/         # Componentes de la interfaz
-│   │   ├── BodyComments.tsx # Lista de mensajes con scroll automático
-│   │   ├── CardComment.tsx  # Burbuja de mensaje individual
-│   │   ├── CommentInput.tsx # Barra de escritura, suscripción Realtime y envío
-│   │   └── UserInput.tsx    # Pantalla de onboarding y selección de avatar
-│   ├── services/           # Servicios e integraciones externas
-│   │   ├── cloudinary.ts    # Servicio de fallback para imágenes
-│   │   └── supabase.ts      # Consultas a la base de datos, Storage y Realtime
-│   ├── store/              # Estado global con Zustand
-│   │   └── preferences.ts   # Store de usuario y mensajes con persistencia
-│   ├── types/              # Definiciones de tipos TypeScript
-│   │   └── index.ts         # Interfaces de User, Comment y CommentRes
-│   ├── App.tsx             # Componente raíz y control de flujo
-│   ├── main.tsx            # Punto de entrada de la aplicación
-│   ├── supabaseClient.ts   # Inicialización del cliente oficial de Supabase
-│   └── index.css           # Directivas globales de Tailwind CSS
-├── .env.example            # Plantilla de variables de entorno
-├── index.html              # HTML base
-├── package.json            # Dependencias y scripts del proyecto
-├── tailwind.config.js      # Configuración de Tailwind CSS
-├── tsconfig.json           # Configuración de TypeScript
-└── vite.config.ts          # Configuración del bundler Vite
+│   ├── components/          # Componentes de la interfaz
+│   │   ├── BodyComments.tsx  # Canvas de mensajes con scroll fluido y fecha iOS
+│   │   ├── CardComment.tsx   # Burbuja iMessage, comunicado oficial y moderación
+│   │   ├── CommentInput.tsx  # Barra iMessage, Header translúcido y Action Sheet Admin
+│   │   └── UserInput.tsx     # Tarjeta de onboarding iOS con firma de autor
+│   ├── services/            # Capa de servicios y comunicación externa
+│   │   ├── cloudinary.ts     # Fallback de subida de imágenes
+│   │   └── supabase.ts       # Consultas, borrado, subida y difusión
+│   ├── store/               # Estado global de la aplicación
+│   │   └── preferences.ts    # Store Zustand con tema, usuario y mensajes
+│   ├── types/               # Tipos e interfaces TypeScript
+│   │   └── index.ts          # Definición de Comment, User y CommentRes
+│   ├── App.tsx              # Componente principal con contenedor iOS y theme listener
+│   ├── main.tsx             # Punto de montaje React DOM
+│   ├── supabaseClient.ts    # Inicialización del SDK de Supabase
+│   └── index.css            # Estilos globales y scrollbar ultra fino
+├── .env.example             # Plantilla de variables de entorno
+├── index.html               # Documento HTML con soporte iOS status bar
+├── package.json             # Dependencias y scripts npm
+├── tailwind.config.js       # Configuración de paleta y Dark Mode
+├── tsconfig.json            # Configuración de compilador TypeScript
+└── vite.config.ts           # Configuración del bundler Vite
 ```
 
 ---
 
-## ⚙️ Instalación y Puesta en Marcha
+## ⚙️ Guía de Instalación y Ejecución Local
 
 ### 1. Clonar el repositorio e instalar dependencias
+
 ```bash
 # Clonar el proyecto
 git clone <URL_DEL_REPOSITORIO>
 
-# Entrar al directorio
+# Ingresar al directorio
 cd app-comments
 
 # Instalar paquetes
@@ -84,6 +115,7 @@ npm install
 ```
 
 ### 2. Configurar Variables de Entorno
+
 Crea un archivo `.env` en la raíz del proyecto basándote en `.env.example`:
 
 ```env
@@ -91,11 +123,12 @@ VITE_SUPABASE_URL=https://TU_PROYECTO.supabase.co
 VITE_SUPABASE_KEY=TU_ANON_PUBLIC_KEY
 ```
 
-### 3. Configurar Supabase (Base de Datos & Realtime)
-En el **SQL Editor** de tu panel de Supabase, ejecuta el siguiente script:
+### 3. Configurar la Base de Datos en Supabase
+
+En el **SQL Editor** de tu consola de Supabase, ejecuta el siguiente script para crear la tabla, habilitar Realtime y configurar las políticas de seguridad (RLS):
 
 ```sql
--- 1. Crear tabla de comentarios / mensajes
+-- 1. Crear tabla de mensajes
 CREATE TABLE IF NOT EXISTS public.comments (
     id BIGSERIAL PRIMARY KEY,
     name TEXT NOT NULL,
@@ -106,7 +139,7 @@ CREATE TABLE IF NOT EXISTS public.comments (
     "updatedAt" TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. Habilitar seguridad por fila (RLS) y permitir operaciones públicas
+-- 2. Habilitar seguridad por fila (RLS)
 ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Lectura publica de mensajes" ON public.comments
@@ -115,7 +148,10 @@ CREATE POLICY "Lectura publica de mensajes" ON public.comments
 CREATE POLICY "Insercion publica de mensajes" ON public.comments
     FOR INSERT WITH CHECK (true);
 
--- 3. Habilitar la replicación en tiempo real (Realtime)
+CREATE POLICY "Permitir borrado publico de mensajes" ON public.comments
+    FOR DELETE USING (true);
+
+-- 3. Habilitar canal de tiempo real (Realtime)
 ALTER PUBLICATION supabase_realtime ADD TABLE public.comments;
 
 -- 4. Crear bucket público para almacenamiento de imágenes
@@ -131,29 +167,30 @@ CREATE POLICY "Lectura publica de imagenes" ON storage.objects
 ```
 
 ### 4. Iniciar el Servidor de Desarrollo
+
 ```bash
 npm run dev
 ```
-Abre tu navegador en `http://localhost:5173` (o el puerto indicado en tu terminal).
+
+Abre tu navegador en `http://localhost:5173` (o el puerto mostrado en la consola).
 
 ---
 
-## 🧪 Cómo Probar la Sincronización en Tiempo Real
+## 🧪 Pruebas de Funcionamiento
 
-1. Abre la aplicación en una pestaña normal de tu navegador e ingresa con el usuario **"Axel"**.
-2. Abre una ventana de **Incógnito** o un navegador diferente e ingresa con el usuario **"Invitado"**.
-3. Envía un mensaje desde cualquier ventana: notarás cómo aparece **instantáneamente** en la otra pantalla sin parpadeos ni recargas.
+1. **Sincronización en Tiempo Real:** Abre dos navegadores o ventanas (una en modo normal y otra en incógnito), ingresa con nombres diferentes y observa cómo los mensajes y fotos aparecen en milisegundos en ambas pantallas.
+2. **Modo Administrador (`axeladmin`):** Ingresa con el usuario `axeladmin` para desbloquear el botón de **Admin**, consultar las estadísticas de la sala, enviar comunicados del sistema o moderar mensajes.
+3. **Modo Oscuro / Claro:** Cambia el tema de tu sistema operativo o presiona el botón de Sol/Luna en el encabezado para ver la transición de colores y la barra de desplazamiento adaptativa.
 
 ---
 
 ## 👤 Autor
 
-Desarrollado con dedicación por **Axel Quintana**  
+Desarrollado con ❤️ y dedicación por **Axel Quintana**  
 *Desarrollador Full Stack & QA Automation*
 
-[![GitHub](https://img.shields.io/badge/GitHub-Profile-181717?style=flat-square&logo=github)](https://github.com/AxelQuintana)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0A66C2?style=flat-square&logo=linkedin)](https://linkedin.com/in/axel-quintana)
+[![GitHub](https://img.shields.io/badge/GitHub-AxelQuintana-181717?style=for-the-badge&logo=github)](https://github.com/AxelQuintana)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Axel_Quintana-0A66C2?style=for-the-badge&logo=linkedin)](https://linkedin.com/in/axel-quintana)
 
 ---
 © 2026 Axel Quintana. Todos los derechos reservados.
-

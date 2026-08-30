@@ -124,10 +124,15 @@ export default function UserInput() {
         >
           {isUploading ? "Cargando..." : "Entrar al Chat"}
         </button>
+
+        <p className="text-[10.5px] text-center text-slate-400 dark:text-slate-500 pt-1.5 font-medium tracking-tight select-none">
+          Desarrollado con ❤️ por <span className="text-palette-bondi dark:text-palette-sinbad font-semibold">Axel Quintana</span>
+        </p>
       </div>
     </section>
   );
 }
+
 
 
 

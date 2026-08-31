@@ -28,6 +28,11 @@ La interfaz está construida siguiendo las directrices de diseño de iOS (*Human
 ## 🚀 Características Principales
 
 * ⚡ **Sincronización en Tiempo Real:** Suscripción directa a eventos `INSERT` y `DELETE` en PostgreSQL a través de **Supabase Realtime WebSockets** sin necesidad de recargar la página.
+* 🔔 **Sistema Integral de Notificaciones:**
+  * 🔊 **Audio Cristalino iOS:** Doble campana sintetizada en tiempo real mediante **Web Audio API** para avisar de nuevos mensajes (con botón de silencio 🔔/🔕).
+  * 🌐 **Notificaciones Web del Sistema:** Alertas nativas de escritorio si recibes un mensaje mientras la pestaña está minimizada o en segundo plano.
+  * 📱 **Banners In-App Flotantes (iOS Dynamic Island):** Píldoras emergentes en la parte superior si te llega un mensaje en otro chat para saltar a él con 1 clic.
+  * 🔴 **Contador en Pestaña:** Indicador dinámico `(1) 💬 Nuevo mensaje` en el título de la página mientras estás ausente.
 * 🔒 **Conversaciones Privadas & Salas Protegidas:**
   * **Chats Directos (1 a 1 DMs):** Inicia chats privados exclusivos con cualquier usuario (ej: entre *Axel* y *Lucas*) con aislamiento de mensajes.
   * **Salas con Código / PIN:** Crea salas privadas protegidas para grupos cerrados.
@@ -38,6 +43,7 @@ La interfaz está construida siguiendo las directrices de diseño de iOS (*Human
   * Burbujas de chat con colas asimétricas iOS (`rounded-[20px] rounded-br-[4px]`).
   * Barra de entrada tipo píldora (*pill input*) con botón de adjuntos **`+`** y botón circular de envío.
   * Píldoras de estado y fecha (*"Hoy • #General"* y *"🔒 Chat Privado"*).
+
 
 * 🌓 **Detección Automática de Tema (Auto Light / Dark Mode):**
   * Sincronización automática en vivo con la preferencia del sistema operativo (`prefers-color-scheme`).

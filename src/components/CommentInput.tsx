@@ -13,9 +13,11 @@ import {
   IoLockClosedOutline,
   IoGlobeOutline,
   IoChevronDownOutline,
+  IoNotificationsOutline,
+  IoNotificationsOffOutline,
 } from "react-icons/io5";
 
-import { useEffect, useState, KeyboardEvent } from "react";
+import { useEffect, useState, useRef, KeyboardEvent } from "react";
 import BodyComments from "./BodyComments";
 import {
   getComments,
@@ -26,6 +28,13 @@ import {
   supabase,
 } from "../services/supabase";
 import { CommentRes, ChatRoom } from "../types";
+import {
+  playIncomingMessageSound,
+  playOutgoingMessageSound,
+  requestNotificationPermission,
+  sendBrowserNotification,
+} from "../utils/notifications";
+
 
 export default function CommentInput() {
   const {
@@ -34,7 +43,12 @@ export default function CommentInput() {
     theme,
     currentRoom,
     privateRooms,
+    soundEnabled,
+    notificationsEnabled,
     setTheme,
+    toggleSound,
+    setNotificationsEnabled,
+    setInAppBanner,
     setCurrentRoom,
     addPrivateRoom,
     removePrivateRoom,
@@ -63,13 +77,33 @@ export default function CommentInput() {
   const [isSendingAnnouncement, setIsSendingAnnouncement] = useState(false);
   const [isDeletingDb, setIsDeletingDb] = useState(false);
 
+  const unreadCountRef = useRef(0);
   const isAdmin = user.name?.trim().toLowerCase() === "axeladmin";
 
   // Identificar información de la sala actual
   const activePrivateRoom = privateRooms.find((r) => r.id === currentRoom);
   const isPrivate = currentRoom !== "general";
 
-  // 1. Cargar comentarios cada vez que se cambia de sala
+  // 1. Manejo de foco y título de la pestaña para contador de no leídos
+  useEffect(() => {
+    const handleFocus = () => {
+      unreadCountRef.current = 0;
+      document.title = "Realtime Chat App";
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        handleFocus();
+      }
+    });
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, []);
+
+  // 2. Cargar comentarios cada vez que se cambia de sala
   useEffect(() => {
     let isMounted = true;
     const loadRoomComments = async () => {
@@ -84,7 +118,7 @@ export default function CommentInput() {
     };
   }, [currentRoom, setComments]);
 
-  // 2. Suscribirse a eventos Realtime de Supabase
+  // 3. Suscribirse a eventos Realtime de Supabase con Notificaciones
   useEffect(() => {
     const channel = supabase
       .channel("realtime-comments-global")
@@ -94,6 +128,8 @@ export default function CommentInput() {
         (payload) => {
           const newMsg = payload.new as CommentRes;
           const msgRoom = newMsg?.room || "general";
+          const isFromOther =
+            newMsg.name?.trim().toLowerCase() !== user.name?.trim().toLowerCase();
 
           // Si el mensaje pertenece a la sala actual, agregarlo en vivo
           if (
@@ -101,6 +137,44 @@ export default function CommentInput() {
             (msgRoom === "general" && currentRoom === "general")
           ) {
             addComment(newMsg);
+          }
+
+          // Si es un mensaje de otro usuario:
+          if (isFromOther) {
+            // A) Reproducir sonido
+            if (soundEnabled) {
+              playIncomingMessageSound();
+            }
+
+            // B) Notificación nativa del navegador si la pestaña está oculta
+            if (document.hidden) {
+              unreadCountRef.current += 1;
+              document.title = `(${unreadCountRef.current}) 💬 Mensaje de @${newMsg.name} - Realtime Chat`;
+
+              sendBrowserNotification(
+                `💬 Nuevo mensaje de @${newMsg.name}`,
+                newMsg.content || "📷 Foto adjunta",
+                newMsg.profileImg,
+                () => {
+                  if (msgRoom !== currentRoom) {
+                    setCurrentRoom(msgRoom);
+                  }
+                }
+              );
+            }
+
+            // C) Si el mensaje es para otra sala / DM, mostrar Banner In-App
+            if (
+              msgRoom !== currentRoom &&
+              !(msgRoom === "general" && currentRoom === "general")
+            ) {
+              setInAppBanner({
+                title: `@${newMsg.name}`,
+                message: newMsg.content || "📷 Foto adjunta",
+                avatar: newMsg.profileImg,
+                roomId: msgRoom,
+              });
+            }
           }
 
           // Si es un mensaje directo para el usuario en otra conversación privada, auto-descubrir la sala
@@ -135,7 +209,16 @@ export default function CommentInput() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentRoom, user.name, addComment, addPrivateRoom, setComments]);
+  }, [
+    currentRoom,
+    user.name,
+    soundEnabled,
+    addComment,
+    addPrivateRoom,
+    setCurrentRoom,
+    setInAppBanner,
+    setComments,
+  ]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0] || null;
@@ -170,6 +253,10 @@ export default function CommentInput() {
 
       await uploadComment(newComment);
 
+      if (soundEnabled) {
+        playOutgoingMessageSound();
+      }
+
       setFile(null);
       setBodyComment("");
     } catch (err) {
@@ -178,6 +265,23 @@ export default function CommentInput() {
       setIsSending(false);
     }
   };
+
+  // Solicitar permiso para notificaciones web
+  const handleToggleNotifications = async () => {
+    if (!notificationsEnabled) {
+      const granted = await requestNotificationPermission();
+      setNotificationsEnabled(granted);
+      if (granted) {
+        sendBrowserNotification(
+          "🔔 Notificaciones activadas",
+          "Te avisaremos cuando recibas nuevos mensajes mientras estés en otra pestaña."
+        );
+      }
+    } else {
+      setNotificationsEnabled(false);
+    }
+  };
+
 
   // Crear o unirse a un Chat Privado 1-a-1
   const handleStartDM = () => {
@@ -317,6 +421,23 @@ export default function CommentInput() {
             <span className="hidden sm:inline">Nuevo Chat</span>
           </button>
 
+          {/* Botón para alternar sonido (Campana) */}
+          <button
+            onClick={toggleSound}
+            title={soundEnabled ? "Sonido Activado (Clic para silenciar)" : "Sonido Silenciado (Clic para activar)"}
+            className={`p-2 rounded-full border transition active:scale-95 cursor-pointer ${
+              soundEnabled
+                ? "bg-palette-bondi-light/70 dark:bg-palette-bondi/20 text-palette-bondi dark:text-palette-sinbad border-palette-bondi/30"
+                : "bg-slate-100 dark:bg-palette-eden text-slate-400 dark:text-slate-500 border-transparent"
+            }`}
+          >
+            {soundEnabled ? (
+              <IoNotificationsOutline size={17} />
+            ) : (
+              <IoNotificationsOffOutline size={17} />
+            )}
+          </button>
+
           {/* Botón rápido para alternar tema */}
           <button
             onClick={() => {
@@ -327,6 +448,7 @@ export default function CommentInput() {
             title={`Tema: ${theme.toUpperCase()}`}
             className="p-2 rounded-full bg-slate-100 dark:bg-palette-eden hover:bg-slate-200/80 dark:hover:bg-palette-eden-card text-slate-600 dark:text-palette-sinbad transition active:scale-95 cursor-pointer"
           >
+
             {theme === "dark" ? (
               <IoMoonOutline size={17} />
             ) : theme === "light" ? (
@@ -462,16 +584,30 @@ export default function CommentInput() {
               )}
             </div>
 
-            <button
-              onClick={() => {
-                setShowRoomSelector(false);
-                setShowNewChatModal(true);
-              }}
-              className="w-full py-3 bg-palette-bondi hover:bg-palette-bondi-hover active:scale-98 text-white text-xs font-bold rounded-2xl transition shadow-md shadow-palette-bondi/25 flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <IoCreateOutline size={16} />
-              Iniciar Nueva Conversación Privada
-            </button>
+            <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-palette-eden">
+              {/* Botón para solicitar notificaciones web */}
+              <button
+                onClick={handleToggleNotifications}
+                className="w-full py-2.5 bg-slate-100 dark:bg-palette-eden hover:bg-slate-200/80 dark:hover:bg-palette-eden-card text-slate-700 dark:text-palette-janna text-xs font-semibold rounded-2xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <IoNotificationsOutline size={15} className="text-palette-bondi" />
+                {notificationsEnabled
+                  ? "🔔 Notificaciones Web: Activas"
+                  : "🔔 Activar Notificaciones Web"}
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowRoomSelector(false);
+                  setShowNewChatModal(true);
+                }}
+                className="w-full py-3 bg-palette-bondi hover:bg-palette-bondi-hover active:scale-98 text-white text-xs font-bold rounded-2xl transition shadow-md shadow-palette-bondi/25 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <IoCreateOutline size={16} />
+                Iniciar Nueva Conversación Privada
+              </button>
+            </div>
+
           </div>
         </div>
       )}

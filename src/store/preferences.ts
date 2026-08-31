@@ -4,6 +4,13 @@ import { persist } from "zustand/middleware"; // Middleware para persistencia
 
 export type ThemeMode = "system" | "light" | "dark";
 
+export type InAppBannerData = {
+  title: string;
+  message: string;
+  avatar: string;
+  roomId: string;
+};
+
 export type CommentState = {
   user: User;
   comment: Comment;
@@ -11,6 +18,9 @@ export type CommentState = {
   theme: ThemeMode;
   currentRoom: string;
   privateRooms: ChatRoom[];
+  soundEnabled: boolean;
+  notificationsEnabled: boolean;
+  inAppBanner: InAppBannerData | null;
   setUser: (data: User) => void;
   setComment: (data: Comment) => void;
   setComments: (data: CommentRes[]) => void;
@@ -20,6 +30,10 @@ export type CommentState = {
   setCurrentRoom: (roomId: string) => void;
   addPrivateRoom: (room: ChatRoom) => void;
   removePrivateRoom: (roomId: string) => void;
+  toggleSound: () => void;
+  setNotificationsEnabled: (enabled: boolean) => void;
+  setInAppBanner: (banner: InAppBannerData) => void;
+  clearInAppBanner: () => void;
   resetUser: () => void;
 };
 
@@ -32,6 +46,9 @@ export const initialCommentState = {
   theme: "system" as ThemeMode,
   currentRoom: "general",
   privateRooms: [] as ChatRoom[],
+  soundEnabled: true,
+  notificationsEnabled: false,
+  inAppBanner: null as InAppBannerData | null,
   comment: {
     name: "",
     profileImg: "",
@@ -64,11 +81,36 @@ export const CommentStore = create<CommentState>()(
           theme,
         })),
 
+      // Acción para alternar sonido
+      toggleSound: () =>
+        set((state) => ({
+          soundEnabled: !state.soundEnabled,
+        })),
+
+      // Acción para actualizar permiso de notificaciones nativas
+      setNotificationsEnabled: (enabled) =>
+        set(() => ({
+          notificationsEnabled: enabled,
+        })),
+
+      // Acción para mostrar banner in-app
+      setInAppBanner: (banner) =>
+        set(() => ({
+          inAppBanner: banner,
+        })),
+
+      // Acción para limpiar banner in-app
+      clearInAppBanner: () =>
+        set(() => ({
+          inAppBanner: null,
+        })),
+
       // Acción para cambiar de sala / conversación
       setCurrentRoom: (roomId) =>
         set(() => ({
           currentRoom: roomId,
           comments: [], // limpiar vista previa mientras carga la nueva sala
+          inAppBanner: null, // cerrar banner si se entra a la sala
         })),
 
       // Acción para agregar una conversación privada a la lista
@@ -124,9 +166,17 @@ export const CommentStore = create<CommentState>()(
     }),
     {
       name: "comment-storage",
+      partialize: (state) => ({
+        user: state.user,
+        theme: state.theme,
+        soundEnabled: state.soundEnabled,
+        notificationsEnabled: state.notificationsEnabled,
+        privateRooms: state.privateRooms,
+      }),
     }
   )
 );
+
 
 
 

@@ -1,22 +1,79 @@
-﻿// Utilidades de Sonido (Web Audio API) y Notificaciones Nativas del Navegador
+// Utilidades de Sonido (Web Audio API + HTML5 Audio Fallback), Vibración Háptica y Notificaciones Web
 
 let audioCtx: AudioContext | null = null;
+let isAudioUnlocked = false;
 
-function getAudioContext(): AudioContext {
-  if (!audioCtx) {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    audioCtx = new AudioContextClass();
-  }
-  if (audioCtx.state === "suspended") {
-    audioCtx.resume();
-  }
-  return audioCtx;
+// Inicializador y desbloqueo de AudioContext para dispositivos móviles (iOS Safari & Android)
+export function initAudioUnlock() {
+  if (isAudioUnlocked) return;
+
+  const unlock = () => {
+    try {
+      if (!audioCtx) {
+        const AudioContextClass =
+          window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+        }
+      }
+      if (audioCtx && audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+      isAudioUnlocked = true;
+    } catch (e) {
+      console.warn("Audio unlock attempt:", e);
+    }
+  };
+
+  window.addEventListener("touchstart", unlock, { once: true, passive: true });
+  window.addEventListener("touchend", unlock, { once: true, passive: true });
+  window.addEventListener("click", unlock, { once: true });
 }
 
-// 1. Sonido de mensaje entrante (Doble campana cristalina estilo iOS / Apple)
+// Inicializar desbloqueo automáticamente al cargar el módulo
+if (typeof window !== "undefined") {
+  initAudioUnlock();
+}
+
+function getAudioContext(): AudioContext | null {
+  try {
+    if (!audioCtx) {
+      const AudioContextClass =
+        window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        audioCtx = new AudioContextClass();
+      }
+    }
+    if (audioCtx && audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+    return audioCtx;
+  } catch (err) {
+    console.warn("No se pudo obtener AudioContext:", err);
+    return null;
+  }
+}
+
+// 1. Vibración háptica para dispositivos móviles (Android / navegadores con soporte)
+export function triggerHapticFeedback(pattern: number | number[] = [80, 50, 80]) {
+  try {
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate(pattern);
+    }
+  } catch (err) {
+    // Ignorar si el dispositivo no soporta vibración
+  }
+}
+
+// 2. Sonido de mensaje entrante (Doble campana cristalina estilo iOS / Apple)
 export function playIncomingMessageSound() {
+  // Vibración háptica en móviles
+  triggerHapticFeedback([100, 40, 100]);
+
   try {
     const ctx = getAudioContext();
+    if (!ctx) return;
+
     const now = ctx.currentTime;
 
     // Primer tono (Nota C6 ~ 1046 Hz)
@@ -46,14 +103,18 @@ export function playIncomingMessageSound() {
     osc2.start(now + 0.09);
     osc2.stop(now + 0.48);
   } catch (err) {
-    console.warn("Web Audio API no inicializada o bloqueada:", err);
+    console.warn("Web Audio no disponible en este momento:", err);
   }
 }
 
-// 2. Sonido de mensaje saliente (Pop suave / "Swoosh")
+// 3. Sonido de mensaje saliente (Pop suave / "Swoosh")
 export function playOutgoingMessageSound() {
+  triggerHapticFeedback(40);
+
   try {
     const ctx = getAudioContext();
+    if (!ctx) return;
+
     const now = ctx.currentTime;
 
     const osc = ctx.createOscillator();
@@ -74,10 +135,20 @@ export function playOutgoingMessageSound() {
   }
 }
 
-// 3. Solicitar permiso de notificaciones del navegador
+// 4. Solicitar permiso de notificaciones del navegador con compatibilidad móvil
 export async function requestNotificationPermission(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+
+  // Si el navegador no tiene la API Notification (ej. Safari en iOS sin PWA)
   if (!("Notification" in window)) {
-    alert("Tu navegador no soporta notificaciones de escritorio.");
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS) {
+      alert(
+        "📱 En iPhone (iOS Safari):\nPara activar notificaciones nativas en segundo plano, pulsa 'Compartir' 📤 y selecciona 'Agregar a Inicio' ➕.\n\nLos sonidos, vibraciones y avisos en pantalla ya están activos."
+      );
+    } else {
+      alert("Este navegador móvil no soporta notificaciones de sistema. Los avisos visuales y sonoros en vivo están activos.");
+    }
     return false;
   }
 
@@ -86,21 +157,30 @@ export async function requestNotificationPermission(): Promise<boolean> {
   }
 
   if (Notification.permission !== "denied") {
-    const permission = await Notification.requestPermission();
-    return permission === "granted";
+    try {
+      const permission = await Notification.requestPermission();
+      return permission === "granted";
+    } catch (e) {
+      console.warn("Error solicitando permisos de notificación:", e);
+      return false;
+    }
   }
 
   return false;
 }
 
-// 4. Mostrar notificación nativa en segundo plano
+// 5. Mostrar notificación nativa en segundo plano
 export function sendBrowserNotification(
   title: string,
   body: string,
   icon?: string,
   onClick?: () => void
 ) {
-  if (!("Notification" in window) || Notification.permission !== "granted") {
+  if (typeof window === "undefined" || !("Notification" in window)) {
+    return;
+  }
+
+  if (Notification.permission !== "granted") {
     return;
   }
 
@@ -126,3 +206,4 @@ export function sendBrowserNotification(
     console.warn("Error mostrando notificación del navegador:", err);
   }
 }
+

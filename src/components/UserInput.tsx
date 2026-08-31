@@ -2,6 +2,7 @@ import { CommentStore } from "../store/preferences";
 import { useState } from "react";
 import { FaRegImage, FaUserCircle } from "react-icons/fa";
 import { uploadImageToStorage } from "../services/supabase";
+import { initAudioUnlock } from "../utils/notifications";
 
 export default function UserInput() {
   const { setUser } = CommentStore();
@@ -16,6 +17,8 @@ export default function UserInput() {
 
   const handleEnterChat = async () => {
     if (!userName.trim() || isUploading) return;
+    initAudioUnlock();
+
 
     try {
       setIsUploading(true);
